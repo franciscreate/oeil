@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Œil animé – suivi du pointeur</title>
-<meta name="description" content="Œil animé qui suit le pointeur et cligne toutes les 10 secondes.">
+<meta name="description" content="Œil animé qui suit le pointeur (ou l'inclinaison du téléphone) et cligne toutes les 10 secondes.">
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#e6e6e5}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -47,6 +47,25 @@ const mvT=(g,k)=>g.setAttribute("transform","translate("+(x*AX*k).toFixed(1)+" "
 (function f(now){requestAnimationFrame(f);const dt=Math.min(.05,(now-last)/1e3);last=now;
   if(now-pt>3500){tx=0;ty=0}const k=1-Math.exp(-dt*(tx||ty?9:3));x+=(tx-x)*k;y+=(ty-y)*k;
   mvT(ring,.6);mvT(iris,1);mvT(pupil,1.35)})(performance.now());
+// Mobile : l'œil suit l'inclinaison du téléphone (même mouvement que le pointeur)
+const AMP=22;let base=null;
+function tilt(b,g){if(still||b==null||g==null)return;
+  const a=((screen.orientation&&screen.orientation.angle)||window.orientation||0)%360;
+  let ix=g,iy=b; // portrait
+  if(a===90){ix=b;iy=-g}else if(a===270||a===-90){ix=-b;iy=g}else if(a===180){ix=-g;iy=-b}
+  if(!base||base.a!==a)base={a:a,x:ix,y:iy};
+  base.x+=(ix-base.x)*.004;base.y+=(iy-base.y)*.004; // le « centre » se recale doucement
+  let dx=(ix-base.x)/AMP,dy=(iy-base.y)/AMP;const d=Math.hypot(dx,dy);if(d>1){dx/=d;dy/=d}
+  tx=dx;ty=dy;pt=performance.now()}
+const onOri=e=>tilt(e.beta,e.gamma);
+function startTilt(){const D=window.DeviceOrientationEvent;if(!D)return;
+  if(typeof D.requestPermission==="function"){D.requestPermission().then(r=>{if(r==="granted")addEventListener("deviceorientation",onOri)}).catch(()=>{})}
+  else addEventListener("deviceorientation",onOri)}
+if(window.DeviceOrientationEvent&&typeof DeviceOrientationEvent.requestPermission==="function")
+  addEventListener("touchend",startTilt,{once:true}); // iPhone : autorisation après un premier toucher
+else startTilt();
+// Plan B : la page parente peut relayer l'inclinaison → postMessage({oeilTilt:[beta,gamma]},"*")
+addEventListener("message",e=>{const t=e.data&&e.data.oeilTilt;if(Array.isArray(t))tilt(+t[0],+t[1])});
 // Option d'intégration (facultatif) : ?bg=transparent  ou  ?bg=e6e6e5
 const bg=new URLSearchParams(location.search).get("bg");
 if(/^(transparent|[0-9a-f]{3,8})$/i.test(bg||""))document.documentElement.style.setProperty("--bg",bg==="transparent"?bg:"#"+bg);
